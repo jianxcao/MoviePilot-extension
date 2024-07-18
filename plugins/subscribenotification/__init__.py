@@ -11,7 +11,7 @@ from typing import Any, List, Dict, Tuple, Optional
 from app.log import logger
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from app.schemas import NotificationType, Notification, MediaType
+from app.schemas import NotificationType, MediaType
 
 
 class SubscribeNotification(_PluginBase):
@@ -22,7 +22,7 @@ class SubscribeNotification(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/sub-alert.png"
     # 插件版本
-    plugin_version = "1.0"
+    plugin_version = "1.1"
     # 插件作者
     plugin_author = "jianxcao,thsrite"
     # 加载顺序
@@ -34,6 +34,7 @@ class SubscribeNotification(_PluginBase):
     _enabled: bool = False
     _onlyonce: bool = False
     _time = None
+    _img_link = ''
     tmdb = None
     media = None
     subscribe_oper = None
@@ -51,6 +52,7 @@ class SubscribeNotification(_PluginBase):
             self._enabled = config.get("enabled")
             self._onlyonce = config.get("onlyonce")
             self._time = config.get("time")
+            self._img_link = config.get('img_link')
 
             if self._enabled or self._onlyonce:
                 # 周期运行
@@ -90,7 +92,8 @@ class SubscribeNotification(_PluginBase):
         self.update_config({
             "enabled": self._enabled,
             "onlyonce": self._onlyonce,
-            "time": self._time
+            "time": self._time,
+            "img_link": self._img_link
         })
 
     def __send_notify(self):
@@ -127,7 +130,9 @@ class SubscribeNotification(_PluginBase):
                         episodes.append(episode.episode_number)
 
                 if episodes:
-                    if isinstance(subscribe.poster, str) and subscribe.poster != "":
+                    if isinstance(subscribe.backdrop, str) and subscribe.backdrop != "":
+                        imgs.append(subscribe.backdrop)
+                    elif isinstance(subscribe.poster, str) and subscribe.poster != "":
                         imgs.append(subscribe.poster)
                     current_tv_subscribe.append({
                         'name': f"{subscribe.name}",
@@ -145,14 +150,21 @@ class SubscribeNotification(_PluginBase):
                 if not mediainfo:
                     continue
                 if str(mediainfo.release_date) == current_date:
-                    if isinstance(subscribe.poster, str) and subscribe.poster != "":
+                    if isinstance(subscribe.backdrop, str) and subscribe.backdrop != "":
+                        imgs.append(subscribe.backdrop)
+                    elif isinstance(subscribe.poster, str) and subscribe.poster != "":
                         imgs.append(subscribe.poster)
                     current_movie_subscribe.append({
                         'name': f"{subscribe.name} ({subscribe.year})"
                     })
-        if len(imgs) > 0:
+        if len(imgs):
             img_url = random.choice(imgs)
-        logger.info(f"img_url:{img_url}")
+
+        if isinstance(self._img_link, str) and len(self._img_link) > 0:
+            links = list(filter(lambda url: url.startswith(
+                "http"), self._img_link.split("\n")))
+            if len(links) > 0:
+                img_url = random.choice(links)
         # 如当前日期匹配到订阅，则发送通知
         text = ""
         for sub in current_tv_subscribe:
@@ -256,11 +268,55 @@ class SubscribeNotification(_PluginBase):
                                 },
                                 'content': [
                                     {
+                                        'component': 'VTextarea',
+                                        'props': {
+                                            'model': 'img_link',
+                                            'label': '头图',
+                                            'placeholder': '头图配置请用,分割，每次随机取一个,地址以http开始'
+                                        }
+                                    }
+                                ]
+                            },
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                },
+                                'content': [
+                                    {
                                         'component': 'VAlert',
                                         'props': {
                                             'type': 'info',
                                             'variant': 'tonal',
                                             'text': '默认每天9点推送，需开启（订阅）通知类型。'
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VAlert',
+                                        'props': {
+                                            'type': 'info',
+                                            'variant': 'tonal',
+                                            'text': '图片配置说明'
+                                                    '如果不配置图片列表，则会取所有的 backdrop 或者 poster 去做头图，如果取不到则取默认'
+                                                    '头图请用,分割，可以设置多个，会随机一个'
                                         }
                                     }
                                 ]

@@ -3,12 +3,13 @@
     "name": "提醒订阅",
     "description": "推送当天订阅更新内容。",
     "labels": "订阅",
-    "version": "1.0",
+    "version": "1.1",
     "icon": "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/sub-alert.png",
     "author": "jianxcao,thsrite",
     "level": 1,
     "history": {
-      "v1.0": "推送当天订阅更新内容"
+      "v1.0": "推送当天订阅更新内容",
+      "v1.1": "新增图片选项，取图从 backdrop中取"
     }
   }
 }
