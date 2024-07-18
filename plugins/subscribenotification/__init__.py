@@ -22,7 +22,7 @@ class SubscribeNotification(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/sub-alert.png"
     # 插件版本
-    plugin_version = "1.1"
+    plugin_version = "1.2"
     # 插件作者
     plugin_author = "jianxcao,thsrite"
     # 加载顺序
@@ -135,7 +135,7 @@ class SubscribeNotification(_PluginBase):
                     elif isinstance(subscribe.poster, str) and subscribe.poster != "":
                         imgs.append(subscribe.poster)
                     current_tv_subscribe.append({
-                        'name': f"{subscribe.name}",
+                        'name': f"📺 {subscribe.name}",
                         'season': f"第{str(subscribe.season).rjust(2, '0')}季",
                         'episode': f"第{str(episodes[0]).rjust(2, '0')}-{str(episodes[-1]).rjust(2, '0')}集" if len(
                             episodes) > 1 else f"第{str(episodes[0]).rjust(2, '0')}集"
@@ -155,7 +155,7 @@ class SubscribeNotification(_PluginBase):
                     elif isinstance(subscribe.poster, str) and subscribe.poster != "":
                         imgs.append(subscribe.poster)
                     current_movie_subscribe.append({
-                        'name': f"{subscribe.name} ({subscribe.year})"
+                        'name': f"🎬 {subscribe.name} ({subscribe.year})"
                     })
         if len(imgs):
             img_url = random.choice(imgs)
