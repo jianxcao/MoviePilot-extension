@@ -1,0 +1,14 @@
+{
+  "SubscribeNotification": {
+    "name": "提醒订阅",
+    "description": "推送当天订阅更新内容。",
+    "labels": "订阅",
+    "version": "1.0",
+    "icon": "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/sub-alert.png",
+    "author": "jianxcao,thsrite",
+    "level": 1,
+    "history": {
+      "v1.0": "推送当天订阅更新内容"
+    }
+  }
+}
