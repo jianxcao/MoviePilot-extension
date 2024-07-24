@@ -10,22 +10,21 @@ from app.log import logger
 def add_default_attr(method, attr_name, default_value: str):
     @wraps(method)
     def wrapper(self, message: Notification):
-        if not hasattr(message, attr_name):
+        if not hasattr(message, attr_name) or getattr(message, attr_name) is None:
             setattr(message, attr_name, default_value)
         return method(self, message)
 
     return wrapper
 
+old_post_message = ChainBase.post_message
 
-
-
-class SubscribeNotification(_PluginBase):
+class UserDefaultMsgImg(_PluginBase):
     # 插件名称
     plugin_name = "通知默认图片设置"
     # 插件描述
     plugin_desc = "可以将通知设置一个默认的图片"
     # 插件图标
-    plugin_icon = "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/sub-alert.png"
+    plugin_icon = "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/img.png"
     # 插件版本
     plugin_version = "1.0"
     # 插件作者
@@ -43,6 +42,11 @@ class SubscribeNotification(_PluginBase):
         self.stop_service()
         if config:
             self._img_link = config.get('img_link')
+            self._enabled = config.get('enabled')
+            self.__update_config()
+            if not isinstance(self._img_link, str) or not len(self._img_link) > 0:
+                self._img_link = "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/mp.jpg"
+            self.__post_message_width_img = add_default_attr(old_post_message, "image", self._img_link)
             self.__post_message_re_define()
 
     def __update_config(self):
@@ -52,10 +56,8 @@ class SubscribeNotification(_PluginBase):
         })
 
     def __post_message_re_define(self):
-        if not isinstance(self._img_link, str) or not len(self._img_link) > 0:
-            self._img_link = "abc"
         if self._enabled:
-            ChainBase.post_message = add_default_attr(ChainBase.post_message, "image", self._img_link)
+            ChainBase.post_message = self.__post_message_width_img
 
     def get_state(self) -> bool:
         return self._enabled
@@ -106,6 +108,27 @@ class SubscribeNotification(_PluginBase):
                                 },
                                 'content': [
                                     {
+                                        'component': 'VTextarea',
+                                        'props': {
+                                            'model': 'img_link',
+                                            'label': '头图',
+                                            'placeholder': '默认通知头图配置'
+                                        }
+                                    }
+                                ]
+                            },
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                },
+                                'content': [
+                                    {
                                         'component': 'VAlert',
                                         'props': {
                                             'type': 'info',
@@ -128,4 +151,4 @@ class SubscribeNotification(_PluginBase):
         pass
 
     def stop_service(self):
-        pass
+        ChainBase.post_message = old_post_message

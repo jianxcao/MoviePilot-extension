@@ -12,5 +12,17 @@
       "v1.1": "新增图片选项，取图从 backdrop中取",
       "v1.2": "添加小图标"
     }
+  },
+  "UserDefaultMsgImg": {
+    "name": "通知默认图片设置",
+    "description": "可以将通知设置一个默认的图片",
+    "labels": "工具",
+    "version": "1.0",
+    "icon": "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/img.png",
+    "author": "jianxcao",
+    "level": 1,
+    "history": {
+      "v1.0": "首个版本"
+    }
   }
 }
