@@ -1,12 +1,13 @@
 from app.chain import ChainBase
 from functools import wraps
-from app.schemas import Notification
 from app.plugins import _PluginBase
 from typing import Any, List, Dict, Tuple
 from app.log import logger
 from app.chain.tmdb import TmdbChain
 from app.utils.web import WebUtils
 from app.core.config import settings
+from app import schemas
+from app.schemas import Notification, NotificationType
 
 
 def add_default_attr(method, img_link: str | None):
@@ -40,7 +41,7 @@ class UserDefaultMsgImg(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/img.png"
     # 插件版本
-    plugin_version = "1.1"
+    plugin_version = "1.2"
     # 插件作者
     plugin_author = "jianxcao"
     # 加载顺序
@@ -79,8 +80,25 @@ class UserDefaultMsgImg(_PluginBase):
     def get_command() -> List[Dict[str, Any]]:
         pass
 
+    def notify(self, apikey: str, title: str = None,
+               text: str = None, image: str = None, link: str = None, userid: str = None):
+        if apikey != settings.API_TOKEN:
+            return schemas.Response(success=False, message="API密钥错误")
+        if not link:
+            link = settings.MP_DOMAIN("/")
+        self.chain.post_message(message=Notification(
+            mtype=NotificationType.Other, title=title, text=text,
+            image=image, link=link, userid=userid
+        ))
+
     def get_api(self) -> List[Dict[str, Any]]:
-        pass
+        return [{
+            "path": "/send_msg",  # API路径，必须以/开始
+            "endpoint": self.notify,  # API响应方法
+            "methods": ["GET"],  # 请求方式：GET/POST/PUT/DELETE
+            "summary": "通知",  # API名称
+            "description": "通知",  # API描述
+        }]
 
     def get_form(self) -> Tuple[List[dict], Dict[str, Any]]:
         """
