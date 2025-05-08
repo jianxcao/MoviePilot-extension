@@ -1,3 +1,4 @@
+import re
 import time
 import os
 from app.plugins import _PluginBase
@@ -17,7 +18,7 @@ class Media302(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/media302.png"
     # 插件版本
-    plugin_version = "1.0"
+    plugin_version = "1.1"
     # 插件作者
     plugin_author = "jianxcao"
     # 加载顺序
@@ -28,6 +29,7 @@ class Media302(_PluginBase):
     _include_dirs = ""
     _media302_host = ""
     _media302_token = ""
+    _transfer_folder = ""
     _enabled = False
 
     def init_plugin(self, config: dict = None):
@@ -37,6 +39,7 @@ class Media302(_PluginBase):
             self._include_dirs = config.get('include_dirs')
             self._media302_host = config.get('media302_host')
             self._media302_token = config.get('media302_token')
+            self._transfer_folder = config.get('transfer_folder')
             self._enabled = config.get('enabled')
             if self._enabled:
                 logger.info(f"启用Media302: {self._media302_host} {self._media302_token}")
@@ -75,12 +78,48 @@ class Media302(_PluginBase):
         res = requests.get(f"{self._media302_host}/strm/api/task/upload-by-path", headers={"Authorization": f"{self._media302_token}"}, params={"path": target_item.path})
         logger.info(f"media302触发事件结果 : {res.status_code} {res.json()}")
 
+    def parse_share_url(self, share_url: str):
+        pattern = re.compile(r'(?:115|anxia|115cdn)\.com/s/([^?]+)(?:\?password=([^&#]+))?')
+        matches = pattern.search(share_url)
+        logger.info(f"media302触发事件: {matches}")
+        if not matches:
+            raise ValueError("无效的分享链接")
+        return matches.groups()
+
+    @eventmanager.register(EventType.UserMessage)
+    def msg(self, event: Event):
+        if not event.event_data:
+            return
+        if not self._enabled:
+            return
+        # logger.info(f"media302触发事件: {event.event_data}")
+        message = event.event_data.get("text")
+        if not message:
+            return
+        message = message.strip()
+        message = message[1:]
+        logger.info(f"media302触发事件: {message} {message.startswith('http')}")
+        if not self._transfer_folder:
+            logger.error(f"media302触发事件: 未设置转移文件夹")
+            return
+        if message.startswith('http'):
+            try:
+                res = self.parse_share_url(message)
+                logger.info(f"media302触发事件: res")
+                if res:
+                    res = requests.get(f"{self._media302_host}/strm/api/task/save-share", headers={"Authorization": f"{self._media302_token}"}, params={"url": message, "folder": self._transfer_folder})
+                    logger.info(f"media302触发事件结果 : {res.status_code} {res.json()}")
+            except Exception as e:
+                logger.error(f"media302触发事件: {e}")
+           
+
     def __update_config(self):
         self.update_config({
             "enabled": self._enabled,
             "include_dirs": self._include_dirs,
             "media302_host": self._media302_host,
-            "media302_token": self._media302_token
+            "media302_token": self._media302_token,
+            "transfer_folder": self._transfer_folder
         })
 
     def get_state(self) -> bool:
@@ -114,6 +153,18 @@ class Media302(_PluginBase):
                                             'model': 'enabled',
                                             'label': '启用插件',
                                         }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 6,
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextField',
+                                        'props': {'model': 'transfer_folder', 'label': '转移文件夹'}
                                     }
                                 ]
                             }

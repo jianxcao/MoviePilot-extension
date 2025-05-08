@@ -3,13 +3,14 @@
         "name": "Media302",
         "description": "Media302",
         "labels": "工具",
-        "version": "1.0",
+        "version": "1.1",
         "icon": "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/media302.png",
         "author": "jianxcao",
         "level": 1,
         "v2": true,
         "history": {
-            "v1.0": "首个版本"
+            "v1.0": "首个版本",
+            "v1.1": "支持#https://115转移"
         }
     }
 }
