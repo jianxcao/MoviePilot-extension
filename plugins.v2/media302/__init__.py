@@ -1,6 +1,13 @@
+import time
+import os
 from app.plugins import _PluginBase
 from typing import Any, List, Dict, Tuple
 from app.log import logger
+from app.schemas import TransferInfo
+from app.schemas.types import  EventType
+from app.core.event import  eventmanager, Event
+from pathlib import Path
+import requests
 
 class Media302(_PluginBase):
     # 插件名称
@@ -31,7 +38,42 @@ class Media302(_PluginBase):
             self._media302_host = config.get('media302_host')
             self._media302_token = config.get('media302_token')
             self._enabled = config.get('enabled')
+            if self._enabled:
+                logger.info(f"启用Media302: {self._media302_host} {self._media302_token}")
             self.__update_config()
+
+    # 入库调用
+    @eventmanager.register(EventType.TransferComplete)
+    def evt_file_insert(self, event: Event):
+        if not event.event_data:
+            return
+        if not self._enabled:
+            return
+        transferinfo: TransferInfo = event.event_data.get("transferinfo")
+        if not transferinfo.success:
+            return
+        target_item = transferinfo.target_item
+        if not target_item:
+            return
+        if target_item.storage != "local" or target_item.type != "file":
+            return
+        if not target_item.path:
+            return
+        logger.info(f"media302触发事件前: {target_item}")
+        if self._include_dirs:
+            include_dirs = self._include_dirs.split("\n")
+            for include_dir in include_dirs:
+                if target_item.path.startswith(include_dir):
+                    break
+            else:
+                logger.info(f"media302触发事件: {target_item.path} 不在包含目录中")
+                return
+        
+        time.sleep(1)
+        info = os.stat(target_item.path)
+        logger.info(f"media302触发事件: {target_item.path} {info}")
+        res = requests.get(f"{self._media302_host}/strm/api/task/upload-by-path", headers={"Authorization": f"{self._media302_token}"}, params={"path": target_item.path})
+        logger.info(f"media302触发事件结果 : {res.status_code} {res.json()}")
 
     def __update_config(self):
         self.update_config({
@@ -127,8 +169,8 @@ class Media302(_PluginBase):
                                         'component': 'VTextarea',
                                         'props': {
                                             'model': 'include_dirs',
-                                            'label': '头图',
-                                            'placeholder': '默认通知头图配置'
+                                            'label': '包含目录',
+                                            'placeholder': '包含目录'
                                         }
                                     }
                                 ]
@@ -144,5 +186,8 @@ class Media302(_PluginBase):
     def get_page(self) -> List[dict]:
         pass
     
+    def get_api(self) -> List[Dict[str, Any]]:
+        pass
+
     def stop_service(self):
         pass
