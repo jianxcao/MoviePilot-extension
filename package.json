@@ -17,7 +17,7 @@
     "name": "通知默认图片设置",
     "description": "可以将通知设置一个默认的图片",
     "labels": "工具",
-    "version": "1.2",
+    "version": "1.3",
     "icon": "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/img.png",
     "author": "jianxcao",
     "level": 1,
@@ -25,7 +25,8 @@
     "history": {
       "v1.0": "首个版本",
       "v1.1": "默认图片调用 tmd 或者 bing 每日图片",
-      "v1.2": "添加send_msg api"
+      "v1.2": "添加send_msg api",
+      "v1.3": "兼容新版"
     }
   }
 }

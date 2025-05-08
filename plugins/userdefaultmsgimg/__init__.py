@@ -1,19 +1,31 @@
 from app.chain import ChainBase
 from functools import wraps
 from app.plugins import _PluginBase
-from typing import Any, List, Dict, Tuple
+from typing import Any, List, Dict, Tuple, Optional
 from app.log import logger
 from app.chain.tmdb import TmdbChain
 from app.utils.web import WebUtils
 from app.core.config import settings
 from app import schemas
 from app.schemas import Notification, NotificationType
+import inspect
+
+
 
 
 def add_default_attr(method, img_link: str | None):
+    # 获取原始方法的签名和类型注解
+    sig = inspect.signature(method)
     @wraps(method)
-    def wrapper(self, message: Notification):
-        if not hasattr(message, "image") or getattr(message, "image") is None:
+    def wrapper(self, *args, **kwargs):
+        # 将位置参数转换为关键字参数
+        bound_args = sig.bind(self, *args, **kwargs)
+        bound_args.apply_defaults()
+        # 获取 message 参数
+        message = bound_args.arguments.get('message')
+        
+        # 处理图片逻辑
+        if message and (not hasattr(message, "image") or getattr(message, "image") is None):
             img_url = img_link
             if not isinstance(img_url, str) or not len(img_url) > 0:
                 if settings.WALLPAPER == "tmdb":
@@ -25,8 +37,10 @@ def add_default_attr(method, img_link: str | None):
                     "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/mp.jpg"
             setattr(message, "image", img_url)
             logger.info(f"image_url: {img_url}")
-        return method(self, message)
-
+        
+        # 调用原始方法
+        return method(self, *args, **kwargs)
+    
     return wrapper
 
 
@@ -41,7 +55,7 @@ class UserDefaultMsgImg(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/img.png"
     # 插件版本
-    plugin_version = "1.2"
+    plugin_version = "1.3"
     # 插件作者
     plugin_author = "jianxcao"
     # 加载顺序
@@ -180,6 +194,6 @@ class UserDefaultMsgImg(_PluginBase):
 
     def get_page(self) -> List[dict]:
         pass
-
+    
     def stop_service(self):
         ChainBase.post_message = old_post_message
