@@ -4,7 +4,21 @@ from app.plugins import _PluginBase
 from typing import Any, List, Dict, Tuple, Optional
 from app.log import logger
 from app.chain.tmdb import TmdbChain
-from app.utils.web import WebUtils
+import importlib
+
+# Dynamic imports with fallback
+WebUtils = None
+WallpaperHelper = None
+
+try:
+    WebUtils = getattr(importlib.import_module('app.utils.web'), 'WebUtils')
+except (ImportError, AttributeError):
+    logger.warning("app.utils.web.WebUtils not found, some features may be limited")
+
+try:
+    WallpaperHelper = getattr(importlib.import_module('app.helper.wallpaper'), 'WallpaperHelper')
+except (ImportError, AttributeError):
+    logger.warning("app.helper.wallpaper.WallpaperHelper not found, some features may be limited")
 from app.core.config import settings
 from app import schemas
 from app.schemas import Notification, NotificationType
@@ -31,9 +45,14 @@ def add_default_attr(method, img_link: str | None):
                 if settings.WALLPAPER == "tmdb":
                     url = TmdbChain().get_random_wallpager()
                 else:
-                    url = WebUtils.get_bing_wallpaper()
-                logger.info(f"tmdb_url:{url}, {url}")
-                img_url = url if isinstance(url, str) and url else \
+                    # Try to get wallpaper from available helpers
+                    url = None
+                    if WebUtils and hasattr(WebUtils, 'get_bing_wallpaper'):
+                        url = WebUtils.get_bing_wallpaper()
+                    elif WallpaperHelper and hasattr(WallpaperHelper, 'get_bing_wallpaper'):
+                        url = WallpaperHelper().get_bing_wallpaper()
+                logger.info(f"Wallpaper URL: {url}")
+                img_url = url if isinstance(url, str) and url.strip() else \
                     "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/mp.jpg"
             setattr(message, "image", img_url)
             logger.info(f"image_url: {img_url}")
@@ -55,7 +74,7 @@ class UserDefaultMsgImg(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/img.png"
     # 插件版本
-    plugin_version = "1.3"
+    plugin_version = "1.4"
     # 插件作者
     plugin_author = "jianxcao"
     # 加载顺序
