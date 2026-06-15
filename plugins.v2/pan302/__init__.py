@@ -18,7 +18,7 @@ class Pan302(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/pan302.png"
     # 插件版本
-    plugin_version = "1.2"
+    plugin_version = "1.3"
     # 插件作者
     plugin_author = "jianxcao"
     # 加载顺序
@@ -75,8 +75,9 @@ class Pan302(_PluginBase):
         time.sleep(1)
         info = os.stat(target_item.path)
         logger.info(f"pan302触发事件: {target_item.path} {info}")
+        pan302_host = (self._pan302_host or "").rstrip('/')
         res = requests.get(
-            f"{self._pan302_host}/api/sync/upload-by-path",
+            f"{pan302_host}/api/sync/upload-by-path",
             headers={"Authorization": f"Bearer {self._pan302_token}"},
             params={"path": target_item.path},
             timeout=30,
@@ -119,7 +120,8 @@ class Pan302(_PluginBase):
                 res = self.parse_share_url(message)
                 logger.info(f"pan302触发事件: res")
                 if res:
-                    res = requests.get(f"{self._pan302_host}/strm/api/task/save-share", headers={"Authorization": f"{self._pan302_token}"}, params={"url": message, "folder": self._transfer_folder})
+                    pan302_host = (self._pan302_host or "").rstrip('/')
+                    res = requests.get(f"{pan302_host}/strm/api/task/save-share", headers={"Authorization": f"{self._pan302_token}"}, params={"url": message, "folder": self._transfer_folder})
                     logger.info(f"pan302触发事件结果 : {res.status_code} {res.json()}")
             except Exception as e:
                 logger.error(f"pan302触发事件: {e}")
