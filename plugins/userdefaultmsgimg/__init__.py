@@ -5,6 +5,11 @@ from typing import Any, List, Dict, Tuple, Optional
 from app.log import logger
 from app.chain.tmdb import TmdbChain
 import importlib
+import inspect
+import requests
+from app.core.config import settings
+from app import schemas
+from app.schemas import Notification, NotificationType
 
 # Dynamic imports with fallback
 WebUtils = None
@@ -13,17 +18,15 @@ WallpaperHelper = None
 try:
     WebUtils = getattr(importlib.import_module('app.utils.web'), 'WebUtils')
 except (ImportError, AttributeError):
-    logger.warning("app.utils.web.WebUtils not found, some features may be limited")
+    pass
 
 try:
-    WallpaperHelper = getattr(importlib.import_module('app.helper.wallpaper'), 'WallpaperHelper')
+    WallpaperHelper = getattr(importlib.import_module('app.application.image'), 'WallpaperHelper')
 except (ImportError, AttributeError):
-    logger.warning("app.helper.wallpaper.WallpaperHelper not found, some features may be limited")
-from app.core.config import settings
-from app import schemas
-from app.schemas import Notification, NotificationType
-import inspect
-
+    try:
+        WallpaperHelper = getattr(importlib.import_module('app.helper.wallpaper'), 'WallpaperHelper')
+    except (ImportError, AttributeError):
+        pass
 
 
 
@@ -41,22 +44,43 @@ def add_default_attr(method, img_link: str | None):
         # 处理图片逻辑
         if message and (not hasattr(message, "image") or getattr(message, "image") is None):
             img_url = img_link
-            if not isinstance(img_url, str) or not len(img_url) > 0:
+            if not isinstance(img_url, str) or not img_url.strip():
+                url = None
                 if settings.WALLPAPER == "tmdb":
-                    url = TmdbChain().get_random_wallpager()
+                    try:
+                        url = TmdbChain().get_random_wallpager()
+                    except Exception as err:
+                        logger.warning(f"获取TMDB壁纸失败: {err}")
                 else:
-                    # Try to get wallpaper from available helpers
-                    url = None
-                    if WebUtils and hasattr(WebUtils, 'get_bing_wallpaper'):
-                        url = WebUtils.get_bing_wallpaper()
-                    elif WallpaperHelper and hasattr(WallpaperHelper, 'get_bing_wallpaper'):
-                        url = WallpaperHelper().get_bing_wallpaper()
+                    # 1. 尝试从已装配的系统 WallpaperHelper / WebUtils 获取
+                    try:
+                        if WallpaperHelper and hasattr(WallpaperHelper, 'get_bing_wallpaper'):
+                            url = WallpaperHelper().get_bing_wallpaper()
+                        elif WebUtils and hasattr(WebUtils, 'get_bing_wallpaper'):
+                            url = WebUtils.get_bing_wallpaper()
+                    except Exception:
+                        url = None
+                    
+                    # 2. 如果系统辅助模块由于未初始化或改版返回 None，直接请求 Bing 壁纸接口兜底
+                    if not url:
+                        try:
+                            bing_resp = requests.get(
+                                "https://cn.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1",
+                                timeout=3,
+                                headers={"User-Agent": "Mozilla/5.0"}
+                            )
+                            if bing_resp.status_code == 200:
+                                images = bing_resp.json().get("images") or []
+                                if images and "url" in images[0]:
+                                    url = f"https://cn.bing.com{images[0]['url']}"
+                        except Exception as e:
+                            logger.debug(f"Direct bing fetch error: {e}")
+
                 logger.info(f"Wallpaper URL: {url}")
                 img_url = url if isinstance(url, str) and url.strip() else \
                     "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/mp.jpg"
             setattr(message, "image", img_url)
             logger.info(f"image_url: {img_url}")
-        
         # 调用原始方法
         return method(self, *args, **kwargs)
     
@@ -74,7 +98,7 @@ class UserDefaultMsgImg(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/img.png"
     # 插件版本
-    plugin_version = "1.4"
+    plugin_version = "1.5"
     # 插件作者
     plugin_author = "jianxcao"
     # 加载顺序

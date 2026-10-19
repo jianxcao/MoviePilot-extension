@@ -28,5 +28,24 @@
             "v1.2": "支持触发事件",
             "v1.3": "路径逻辑调整"
         }
+    },
+    "UserDefaultMsgImg": {
+        "name": "通知默认图片设置",
+        "description": "可以将通知设置一个默认的图片",
+        "labels": "工具",
+        "version": "1.5",
+        "icon": "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/img.png",
+        "author": "jianxcao",
+        "level": 1,
+        "v2": true,
+        "v3": true,
+        "history": {
+            "v1.0": "首个版本",
+            "v1.1": "默认图片调用 tmd 或者 bing 每日图片",
+            "v1.2": "添加send_msg api",
+            "v1.3": "兼容新版",
+            "v1.4": "兼容新版",
+            "v1.5": "适配 MoviePilot v3 架构，优化壁纸获取逻辑，消除模块告警"
+        }
     }
 }
