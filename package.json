@@ -37,7 +37,7 @@
     "description": "通过 Chrome DevTools Protocol (CDP) 连接真实浏览器/远程容器进行 PT 站点自动签到与 Cookie 同步。",
     "labels": "站点,签到",
     "version": "1.0",
-    "icon": "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/media302.png",
+    "icon": "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/ptcdpsignin.png",
     "author": "jianxcao",
     "level": 1,
     "v3": true,

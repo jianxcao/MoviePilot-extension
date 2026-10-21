@@ -27,7 +27,7 @@ ALL_SITES = "__all__"
 class PTCDPSignIn(_PluginBase):
     plugin_name = "PT站点CDP签到"
     plugin_desc = "通过 Chrome DevTools Protocol (CDP) 连接真实浏览器/远程容器进行 PT 站点自动签到与 Cookie 同步。"
-    plugin_icon = "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/media302.png"
+    plugin_icon = "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/ptcdpsignin.png"
     plugin_version = "1.0"
     plugin_author = "jianxcao"
     plugin_config_prefix = "ptcdp_"
