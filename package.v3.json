@@ -3,14 +3,15 @@
     "name": "PT站点CDP签到",
     "description": "通过 Chrome DevTools Protocol (CDP) 连接真实浏览器/远程容器进行 PT 站点自动签到与 Cookie 同步。",
     "labels": "站点,签到",
-    "version": "1.1",
+    "version": "1.2",
     "icon": "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/ptcdpsignin.png",
     "author": "jianxcao",
     "level": 1,
     "v3": true,
     "history": {
       "v1.0": "首个版本，支持直连 Chrome/Edge CDP 调试端口进行 Cookie 提取与自动化签到",
-      "v1.1": "修复 CDP 会话、Cookie 与签到判定，恢复站点规则、登录、最近动向和历史任务管理"
+      "v1.1": "修复 CDP 会话、Cookie 与签到判定，恢复站点规则、登录、最近动向和历史任务管理",
+      "v1.2": "优化通知精简文案防截断，修复保存立即运行与 M-Team/憨憨/视界等站点判定"
     }
   }
 }

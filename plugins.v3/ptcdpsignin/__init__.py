@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 from apscheduler.triggers.cron import CronTrigger
 from app.db.oper.site import SiteOper
 from app.schemas import NotificationType
+from app.schemas.types import EventType
 from app.sdk import scheduler as scheduler_sdk
 from app.sdk.config import settings
 from app.sdk.logging import logger
@@ -51,7 +52,7 @@ class PTCDPSignIn(_PluginBase):
     plugin_name = "PT站点CDP签到"
     plugin_desc = "通过 CDP 连接真实浏览器，自动签到、登录刷新 Cookie 并读取最近动向（仅 MoviePilot V3）。"
     plugin_icon = "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/ptcdpsignin.png"
-    plugin_version = "1.1"
+    plugin_version = "1.2"
     plugin_author = "jianxcao"
     plugin_config_prefix = "ptcdp_"
     plugin_order = 30
@@ -109,7 +110,12 @@ class PTCDPSignIn(_PluginBase):
             if run_once or clear_today:
                 self.update_config(dict(values))
             if run_once:
-                self._schedule_once("run-once", delay=1, event=self._stop_event)
+                threading.Thread(
+                    target=self.run_sign_in,
+                    kwargs={"force": True},
+                    daemon=True,
+                    name="PTCDPSignIn-RunOnce"
+                ).start()
 
     @staticmethod
     def _now() -> datetime:
@@ -122,8 +128,34 @@ class PTCDPSignIn(_PluginBase):
 
     @staticmethod
     def get_command() -> list[dict]:
-        """声明本插件不提供聊天命令。"""
-        return []
+        """声明支持远程和前端命令执行。"""
+        return [{
+            "cmd": "/pt_cdp_signin",
+            "event": EventType.PluginAction,
+            "desc": "PT站点CDP签到",
+            "category": "站点",
+            "data": {"action": "pt_cdp_signin"}
+        }]
+
+    def get_api(self) -> list[dict]:
+        """声明 HTTP 触发 API。"""
+        return [{
+            "path": "/run",
+            "endpoint": self.api_run,
+            "methods": ["GET", "POST"],
+            "summary": "立即运行CDP签到",
+            "description": "立即触发一次PT站点CDP签到任务"
+        }]
+
+    def api_run(self) -> dict:
+        """API 触发立即执行。"""
+        threading.Thread(
+            target=self.run_sign_in,
+            kwargs={"force": True},
+            daemon=True,
+            name="PTCDPSignIn-Manual"
+        ).start()
+        return {"code": 0, "message": "已触发PT站点CDP签到"}
 
     def get_api(self) -> list[dict]:
         """声明本插件不注册额外接口。"""
@@ -239,8 +271,13 @@ class PTCDPSignIn(_PluginBase):
 
     def run_sign_in(self, retry_keys: list[str] = None, attempt: int = 0,
                     _event: threading.Event = None, _job_id: str = None,
-                    _round_id: int = None) -> None:
+                    _round_id: int = None, force: bool = False, event: Any = None) -> None:
         """在跨实例互斥下运行有效生命周期的任务并拒绝过期重试。"""
+        if event:
+            event_data = getattr(event, "event_data", None) or {}
+            if event_data.get("action") != "pt_cdp_signin":
+                return
+            force = True
         event = _event if _event is not None else self._stop_event
         with self._condition:
             if event.is_set() or event is not self._stop_event:
@@ -263,7 +300,7 @@ class PTCDPSignIn(_PluginBase):
             self._active = True
             self._active_threads.add(threading.get_ident())
         try:
-            self._run_batch(event, retry_keys, attempt)
+            self._run_batch(event, retry_keys, attempt, force=force)
         except CDPCancelled:
             pass
         except Exception:
@@ -427,20 +464,21 @@ class PTCDPSignIn(_PluginBase):
                 self.del_data(key)
 
     def _notify_results(self, rows: list[dict]) -> None:
-        """通过宿主站点消息通知展示签到、登录和最近动向结果。"""
+        """精简通知文案，直接输出核心状态，避免文本过长被渠道截断。"""
         lines = []
         for row in rows:
+            site = row.get("site", "未知站点")
             parts = []
             if row.get("signin"):
-                label = {"success": "签到成功", "already": "今日已签"}.get(row.get("signin_status"), "签到失败")
-                parts.append(f"{label}：{row.get('signin_message', '')[:150]}")
+                st = row.get("signin_status")
+                label = "签到成功" if st == "success" else ("今日已签" if st == "already" else "签到失败")
+                parts.append(label)
             if row.get("login_requested"):
                 label = "登录成功" if row.get("login_status") == "login" else "登录失败"
-                parts.append(f"{label}：{row.get('login', '')[:150]}")
-            if row.get("activity"):
-                parts.append("最近动向：" + row["activity"][:150])
-            lines.append(f"{row['site']}｜" + "；".join(parts))
-        self.post_message(mtype=NotificationType.SiteMessage, title="PT站点CDP签到结果", text="\n".join(lines))
+                parts.append(label)
+            status_text = "，".join(parts) if parts else "已完成"
+            lines.append(f"{site}: {status_text}")
+        self.post_message(mtype=NotificationType.SiteMessage, title="【PT站点CDP签到】", text="\n".join(lines))
 
     def get_form(self) -> tuple[list[dict], dict]:
         """生成基础设置和可折叠高级设置，并返回全部配置默认值。"""
