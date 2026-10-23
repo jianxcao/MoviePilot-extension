@@ -303,9 +303,9 @@ class PTCDPSignIn(_PluginBase):
             self._run_batch(event, retry_keys, attempt, force=force)
         except CDPCancelled:
             pass
-        except Exception:
-            # 异常可能携带远端 URL、Cookie 或密码，禁止原样记录。
-            logger.error("PT站点CDP签到：本轮执行异常，已停止")
+        except Exception as err:
+            import traceback
+            logger.error(f"PT站点CDP签到：本轮执行异常，已停止：{err}\n{traceback.format_exc()}")
         finally:
             with self._condition:
                 self._active_threads.discard(threading.get_ident())
@@ -318,7 +318,7 @@ class PTCDPSignIn(_PluginBase):
         if event.is_set() or event is not self._stop_event:
             raise CDPCancelled("任务已取消")
 
-    def _run_batch(self, event: threading.Event, retry_keys: list[str] | None, attempt: int) -> None:
+    def _run_batch(self, event: threading.Event, retry_keys: list[str] | None, attempt: int, force: bool = False) -> None:
         """并发执行未完成的站点任务，串行提交结果并调度失败重试。"""
         self._check_current(event)
         config = self._config
@@ -340,9 +340,10 @@ class PTCDPSignIn(_PluginBase):
             signin = self._selected(info["id"], config["site_ids"])
             login = self._selected(info["id"], config["login_site_ids"])
             previous = records.get(key, {})
-            # 两种任务独立缓存，失败重试不会再次执行已成功的另一种操作。
-            signin = signin and previous.get("signin_status") not in SUCCESS
-            login = login and previous.get("login_status") != "login"
+            # 两种任务独立缓存，非强制模式跳过今日已完成，强制模式执行所有已配置项。
+            if not force:
+                signin = signin and previous.get("signin_status") not in SUCCESS
+                login = login and previous.get("login_status") != "login"
             if signin or login:
                 targets.append((info, key, signin, login))
         if not targets:
@@ -532,13 +533,22 @@ class PTCDPSignIn(_PluginBase):
 
     @staticmethod
     def _table(rows: list[dict], headers: list[tuple[str, str]]) -> dict:
-        """构造以普通文本展示结果的标准数据表格。"""
-        return {"component": "VDataTable", "props": {
+        """构造以普通文本展示结果的标准数据表格，汉化分页组件或在少于等于10条时隐藏底栏。"""
+        props: dict[str, Any] = {
             "headers": [{"title": title, "key": key} for title, key in headers],
-            "items": rows, "density": "compact", "items-per-page": 10,
-            "no-data-text": "暂无记录", "class": "mb-4",
-        }}
-
+            "items": rows,
+            "density": "compact",
+            "no-data-text": "暂无记录",
+            "class": "mb-4",
+            "items-per-page-text": "每页条数：",
+            "page-text": "{0}-{1} 共 {2} 条",
+        }
+        if len(rows) <= 10:
+            props["items-per-page"] = -1
+            props["hide-default-footer"] = True
+        else:
+            props["items-per-page"] = 10
+        return {"component": "VDataTable", "props": props}
     def get_page(self) -> list[dict]:
         """分区展示签到、登录、最近动向和最近三十天历史。"""
         latest = self.get_data("latest") or []
