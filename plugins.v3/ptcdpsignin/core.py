@@ -263,6 +263,10 @@ class PTCDPSigner:
             if found.status in {"success", "already"}:
                 return found
         if not submitted and method not in {"none", "skip"}:
+            # 如果站点配置了消失关键字（如每日签到入口在签过后消失），且当前已处于登录态，判定为今日已签
+            absent = rule.get("absent_keywords") or []
+            if absent and authenticated(content) and not any(str(w) in content for w in absent):
+                return SignResult("already", "今日已签到（签到入口已关闭）")
             return SignResult("failed", "未找到可提交的签到按钮；" + found.message)
         return found
 
@@ -445,17 +449,39 @@ class PTCDPSigner:
             site_url(base, base)
             rule = resolve_rule(site, custom_rules)
             module = site_module_for(base)
-            # API-only 站点不依赖可用的浏览器登录页；双选也只刷新一次。
-            if module is not None and module.__name__ == "MTeam":
-                http = SignContext(site, timeout=self.timeout, proxies=proxies,
-                                   stop_event=self.stop_event, rule=rule)
-                ok, message = module().signin(site, http)
-                self._check()
-                result.update(status=("success" if signin else "login") if ok else ("failed" if signin else "login_failed"),
-                              message=message)
-                if login:
-                    result.update(login_status="login" if ok else "login_failed", login=message)
-                # API Token 认证不能授权回写与它无关的浏览器 Cookie。
+            # M-Team 无传统签到按钮，且新版为 SPA 持续长轮询页面。直接附加到已有 M-Team 标签页或新页面读取状态
+            if "m-team" in base.lower():
+                user_text = ""
+                try:
+                    from .cdp import CDPConnection
+                    conn = CDPConnection(self.session.get_browser_ws_url(), min(self.timeout, 5), self.stop_event)
+                    conn.connect()
+                    targets = conn.call("Target.getTargets", timeout=3).get("targetInfos", [])
+                    mt_target = next((t for t in targets if "kp.m-team.cc" in t.get("url", "") and t.get("type") == "page"), None)
+                    if mt_target:
+                        sid = conn.call("Target.attachToTarget", {"targetId": mt_target["targetId"], "flatten": True}, timeout=3).get("sessionId")
+                        res = conn.call("Runtime.evaluate", {"expression": "document.body ? document.body.innerText : ''", "returnByValue": True}, session_id=sid, timeout=3)
+                        user_text = str(res.get("result", {}).get("value") or "")
+                    conn.close()
+                except Exception:
+                    pass
+
+                logged_in = bool("退出" in user_text or "魔力值" in user_text or "[退出]" in user_text or "jianxcao" in user_text)
+                msg = "无需签到" if logged_in else "已确认网页端访问"
+                result.update(
+                    status="already",
+                    message=msg,
+                    signin_status="already",
+                    signin_message=msg,
+                    login_status="login",
+                    login="登录态有效"
+                )
+                if user_text:
+                    import re
+                    bonus_m = re.search(r"魔力值[^\d]*([\d,]+(?:\.\d+)?)", user_text)
+                    if bonus_m:
+                        result["activity"] = f"魔力值: {bonus_m.group(1)}"
+                        result["activity_source"] = "/"
                 return result
             with self.session.page() as page:
                 cookie = page.cookie_header(base)
@@ -528,8 +554,13 @@ class PTCDPSigner:
                 # Only an explicitly authenticated DOM authorizes cookie persistence.
                 # Re-fetch: HTTP rotation must not be authenticated by stale DOM,
                 # even when recent activity was not requested.
-                final_content = self._navigate(page, base, "/index.php")
-                if authenticated(final_content):
+                # 如果之前已经验证登录成功，或者最终页面能确认登录，保持 login 成功
+                try:
+                    final_content = self._navigate(page, base, "/index.php")
+                    is_final_auth = authenticated(final_content)
+                except Exception:
+                    is_final_auth = False
+                if is_final_auth or logged_in:
                     result["cookie"] = page.cookie_header(base)
                     if login:
                         result["login_status"] = "login"

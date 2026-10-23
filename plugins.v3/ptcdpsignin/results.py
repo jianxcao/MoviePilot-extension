@@ -12,8 +12,7 @@ from .rules import (SignResult, DEFAULT_SUCCESS_PATTERN, DEFAULT_ALREADY_PATTERN
 
 
 STREAK_PATTERN = r"连续签到|連續簽到"
-TODAY_SIGNED_PATTERN = r"(?:今日|今天)(?:已经|已經|已)(?:签到|簽到|签|簽)|(?:今日|今天)(?:的)?状态\s*[:：]\s*已(?:签到|簽到)"
-
+TODAY_SIGNED_PATTERN = r"(?:今日|今天)(?:已经|已經|已)(?:签到|簽到|签|簽)|(?:今日|今天)(?:的)?状态\s*[:：]\s*已(?:签到|簽到)|本次签到获得|这是您的第\d+次签到|已签到|已簽到|拒绝访问：已签到"
 
 class VisibleHTML(HTMLParser):
     def __init__(self):
@@ -79,8 +78,12 @@ def challenge_pending(content):
 def authenticated(content):
     parser = visible(content)
     markup = " ".join(parser.markup)
-    return bool(re.search(r"(?:href\s*=\s*['\"][^'\"]*(?:logout|signout)|退出登录|退出登錄|登出|注销|我的控制面板|我的面板)", markup, re.I)) and not login_page(content)
-
+    text = " ".join(parser.parts)
+    has_logout = bool(
+        re.search(r"(?:href\s*=\s*['\"][^'\"]*(?:logout|signout)|退出登录|退出登錄|登出|注销|我的控制面板|我的面板|userdetails\.php\?id=)", markup, re.I)
+        or re.search(r"\[退出\]|退出|登出|注销|魔力值", text, re.I)
+    )
+    return has_logout and not login_page(content)
 
 def login_page(content):
     parser = visible(content)

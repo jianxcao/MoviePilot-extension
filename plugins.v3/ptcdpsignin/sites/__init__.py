@@ -51,16 +51,13 @@ class SignContext(SiteHTTP):
 
 
 def site_module_for(url):
-    """按站点域名选择专用模块，未知站点不匹配。"""
+    """按站点域名选择专用模块，未知站点不匹配。MTeam 不走此 API 模块。"""
     from urllib.parse import urlsplit
     from .hdsky import Hdsky
     from .htpt import Htpt
     from .tjupt import Tjupt
-    from .mteam import MTeam
     host = (urlsplit(url).hostname or "").lower()
-    if any(host == domain or host.endswith("." + domain) for domain in ("m-team.cc", "m-team.io", "m-team.xyz")):
-        return MTeam
-    for module in (Hdsky, Htpt, Tjupt, MTeam):
+    for module in (Hdsky, Htpt, Tjupt):
         domain = module.site_url
         if host == domain or host.endswith("." + domain):
             return module
