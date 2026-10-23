@@ -465,8 +465,11 @@ class PTCDPSigner:
                     conn.close()
                 except Exception:
                     pass
-
-                logged_in = bool("退出" in user_text or "魔力值" in user_text or "[退出]" in user_text or "jianxcao" in user_text)
+                site_user = str(site.get("username") or site.get("user") or site.get("account") or "").strip()
+                logged_in = bool(
+                    "[退出]" in user_text or "退出" in user_text or "魔力值" in user_text or "分享率" in user_text
+                    or (site_user and site_user in user_text)
+                )
                 msg = "无需签到" if logged_in else "已确认网页端访问"
                 result.update(
                     status="already",
