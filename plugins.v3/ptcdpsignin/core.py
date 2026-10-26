@@ -536,6 +536,9 @@ class PTCDPSigner:
                         else:
                             signed = self._browser_sign(page, site, rule, http)
                         result.update(status=signed.status, message=signed.message)
+                        if signed.status in {"success", "already"}:
+                            logged_in = True
+                            login_message = "登录态已认证"
                     except CDPCancelled:
                         raise
                     except Exception as error:
@@ -563,7 +566,9 @@ class PTCDPSigner:
                     is_final_auth = authenticated(final_content)
                 except Exception:
                     is_final_auth = False
-                if is_final_auth or logged_in:
+                # 如果签到成功/已签，或者流程确认了登录，保持登录成功
+                sign_ok = result.get("status") in {"success", "already"} or result.get("signin_status") in {"success", "already"}
+                if is_final_auth or logged_in or sign_ok:
                     result["cookie"] = page.cookie_header(base)
                     if login:
                         result["login_status"] = "login"
