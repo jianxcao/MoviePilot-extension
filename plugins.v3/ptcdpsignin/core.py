@@ -557,7 +557,7 @@ class PTCDPSigner:
                 # Only an explicitly authenticated DOM authorizes cookie persistence.
                 # Re-fetch: HTTP rotation must not be authenticated by stale DOM,
                 # even when recent activity was not requested.
-                # 如果之前已经验证登录成功，或者最终页面能确认登录，保持 login 成功
+                # 检查页面是否保持登录态，只要签到过程或初始已登录且未进入登录页，即视为登录成功
                 try:
                     final_content = self._navigate(page, base, "/index.php")
                     is_final_auth = authenticated(final_content)
@@ -571,7 +571,7 @@ class PTCDPSigner:
                 else:
                     result["cookie"] = ""
                     if login:
-                        result.update(login_status="login_failed", login="最终页面未确认有效登录态")
+                        result.update(login_status="login_failed", login="未确认有效登录态")
                         if not signin:
                             result.update(status="login_failed", message=result["login"])
         except CDPCancelled:

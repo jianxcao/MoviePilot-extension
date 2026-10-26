@@ -327,6 +327,14 @@ class CDPSession:
             page = CDPPage(connection, session_id)
             page._call("Page.enable")
             page._call("Runtime.enable")
+            # 自动处理/忽略 alert、confirm 弹窗，防止阻塞页面 evaluate
+            try:
+                page._call("Page.setInterceptFileChooserDialog", {"enabled": False})
+                page._call("Page.addScriptToEvaluateOnNewDocument", {
+                    "source": "window.alert = function(){}; window.confirm = function(){ return true; }; window.prompt = function(){ return null; };"
+                })
+            except Exception:
+                pass
             if cookie:
                 page.set_cookies(cookie, url)
             if url != "about:blank":
