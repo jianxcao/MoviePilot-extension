@@ -73,7 +73,9 @@ _SNAPSHOT = """(() => {
      if (cloned[i]) cloned[i].remove();
    }
  });
- return {url: location.href, html: copy.outerHTML};
+ const dialogs = (window.__mpDialogs || []).filter(Boolean);
+ const extra = dialogs.length ? '<div id="mp-dialog-text">' + dialogs.join(' ') + '</div>' : '';
+ return {url: location.href, html: copy.outerHTML + extra};
 })()"""
 
 
@@ -131,10 +133,15 @@ class PTCDPSigner:
  if (text) nodes = nodes.filter(el => (el.innerText || el.value || '').trim().includes(text));
  else if (generic) nodes = nodes.filter(el => /^(立即签到|立即簽到|每日签到|每日簽到|签到|簽到|打卡|點擊簽到|点击签到)$/.test((el.innerText || el.value || '').trim()));
  nodes.sort((a,b) => {
-   const action = el => el.matches('button,input,[role="button"]') ? 0 : 1;
+   const action = el => (el.matches('a,button,input,[role="button"]') || el.getAttribute('onclick')) ? 0 : 1;
    return action(a)-action(b) || (a.innerText || a.value || '').length - (b.innerText || b.value || '').length;
  });
- const el = nodes[0]; if (!el) return false;
+ let el = nodes[0]; if (!el) return false;
+ // NexusPHP 常把 onclick 放在「[签到]」链接上，外层 span 文本相同但点击无效。
+ if (!el.matches('a,button,input,[role="button"]') && !el.getAttribute('onclick')) {
+   const child = el.querySelector('a,button,input,[role="button"],[onclick]');
+   if (child && visible(child)) el = child;
+ }
  if (el.href && !el.href.startsWith('javascript:') && new URL(el.href, location.href).origin !== location.origin) throw new Error('cross-origin link refused');
  const form = el.form || el.closest('form');
  if (form && new URL(form.action || location.href, location.href).origin !== location.origin) throw new Error('cross-origin form refused');

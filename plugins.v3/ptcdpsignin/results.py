@@ -145,10 +145,11 @@ def classify(content, rule, submitted=False):
         return SignResult("failed", "验证码或签到提交尚未完成", challenge="captcha")
     lines = [line.strip() for line in re.split(r"[\n。！!；;]", text) if line.strip()]
     status_lines = [line for line in lines if not re.search(RULE_CONTEXT_PATTERN, line)]
-    # 连续天数本身只是统计；同一句明确的今天终态/成功信息不能随统计一起丢弃。
+    # 连续天数本身只是统计；同一句明确的今天终态、成功或奖励不能随统计一起丢弃。
     safe = "\n".join(line for line in status_lines if not re.search(STREAK_PATTERN, line)
                      or re.search(TODAY_SIGNED_PATTERN, line)
-                     or re.search(DEFAULT_SUCCESS_PATTERN, line, re.I))
+                     or re.search(DEFAULT_SUCCESS_PATTERN, line, re.I)
+                     or any(str(word) in line for word in rule.get("success_keywords") or [] if word))
     streak_safe = "\n".join(status_lines)
     safe_markup = " ".join(parser.markup)
     # 预设的连续签到关键词只在真实提交后，或认证页面有当天状态/已签入口时使用。
@@ -166,9 +167,10 @@ def classify(content, rule, submitted=False):
         matched = any(str(word).lower() in (streak_safe if re.search(STREAK_PATTERN, str(word)) else safe).lower()
                       for word in words if word and (not re.search(STREAK_PATTERN, str(word)) or allow_streak))
         pattern = str(rule.get("success" if status == "success" else "already") or default)
-        if not rule.get("strict_status_keywords"):
-            matched = matched or bool(re.search(pattern, safe, re.I))
-        elif rule.get("success" if status == "success" else "already"):
+        # 站点写了自己的成功词时，不要让默认「已签到」在同一句奖励文案上抢先命中。
+        explicit = rule.get("success" if status == "success" else "already")
+        use_default = not rule.get("strict_status_keywords") and not (status == "already" and rule.get("success_keywords"))
+        if use_default or explicit:
             matched = matched or bool(re.search(pattern, safe, re.I))
         if "<" in pattern and re.search(pattern, safe_markup, re.I):
             matched = True

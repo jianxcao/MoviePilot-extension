@@ -327,11 +327,16 @@ class CDPSession:
             page = CDPPage(connection, session_id)
             page._call("Page.enable")
             page._call("Runtime.enable")
-            # 自动处理/忽略 alert、confirm 弹窗，防止阻塞页面 evaluate
+            # 自动接受 alert/confirm，并把文案留在页面上。高清视界的签到结果只出现在 alert 里。
             try:
                 page._call("Page.setInterceptFileChooserDialog", {"enabled": False})
                 page._call("Page.addScriptToEvaluateOnNewDocument", {
-                    "source": "window.alert = function(){}; window.confirm = function(){ return true; }; window.prompt = function(){ return null; };"
+                    "source": (
+                        "window.__mpDialogs=window.__mpDialogs||[];"
+                        "window.alert=function(m){window.__mpDialogs.push(String(m==null?'':m));};"
+                        "window.confirm=function(m){window.__mpDialogs.push(String(m==null?'':m));return true;};"
+                        "window.prompt=function(){return null;};"
+                    ),
                 })
             except Exception:
                 pass
