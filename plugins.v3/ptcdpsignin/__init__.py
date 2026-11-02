@@ -404,9 +404,13 @@ class PTCDPSignIn(_PluginBase):
                             "message": clean(result.get("message")),
                             "signin": previous.get("signin", False) or signin,
                             "login_requested": previous.get("login_requested", False) or login})
-                if signin:
+                if signin and result.get("status") != "login":
                     row["signin_status"] = result.get("status") if result.get("status") in SUCCESS else "failed"
                     row["signin_message"] = clean(result.get("message"))
+                elif result.get("status") == "login":
+                    row["signin"] = False
+                    row.pop("signin_status", None)
+                    row.pop("signin_message", None)
                 if login or result.get("login_status"):
                     row["login_status"] = str(result.get("login_status") or
                                               ("login" if result.get("status") == "login" else "login_failed"))
@@ -416,7 +420,7 @@ class PTCDPSignIn(_PluginBase):
                     row["activity_source"] = clean(result.get("activity_source"))
                 records[key] = row
                 changed.append(row)
-                if (signin and row["signin_status"] not in SUCCESS) or (login and row.get("login_status") != "login"):
+                if (row.get("signin") and row.get("signin_status") not in SUCCESS) or (login and row.get("login_status") != "login"):
                     failed.append(key)
                 # core 合约：非空 Cookie 只在认证确凿时返回，即使签到本身失败。
                 # 失败签到不影响已认证 Cookie 的有效性，空值永远不覆盖原值。

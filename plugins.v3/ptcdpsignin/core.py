@@ -553,10 +553,13 @@ class PTCDPSigner:
                                 signed = self._browser_sign(page, site, rule, http)
                         else:
                             signed = self._browser_sign(page, site, rule, http)
-                        result.update(status=signed.status, message=signed.message)
-                        if signed.status in {"success", "already"}:
-                            logged_in = True
-                            login_message = "登录态已认证"
+                        if signed.missing_path and logged_in:
+                            result.update(status="login", message="此站没有签到，仅确认登录")
+                        else:
+                            result.update(status=signed.status, message=signed.message)
+                            if signed.status in {"success", "already"}:
+                                logged_in = True
+                                login_message = "登录态已认证"
                     except CDPCancelled:
                         raise
                     except Exception as error:
