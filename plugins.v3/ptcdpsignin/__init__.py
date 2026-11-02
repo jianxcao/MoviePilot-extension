@@ -52,7 +52,7 @@ class PTCDPSignIn(_PluginBase):
     plugin_name = "PT站点CDP签到"
     plugin_desc = "通过 CDP 连接真实浏览器，自动签到、登录刷新 Cookie 并读取最近动向（仅 MoviePilot V3）。"
     plugin_icon = "https://raw.githubusercontent.com/jianxcao/MoviePilot-extension/main/img/ptcdpsignin.png"
-    plugin_version = "1.2"
+    plugin_version = "1.3"
     plugin_author = "jianxcao"
     plugin_config_prefix = "ptcdp_"
     plugin_order = 30
