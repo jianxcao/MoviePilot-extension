@@ -137,10 +137,10 @@ class PTCDPSigner:
    return action(a)-action(b) || (a.innerText || a.value || '').length - (b.innerText || b.value || '').length;
  });
  let el = nodes[0]; if (!el) return false;
- // NexusPHP 常把 onclick 放在「[签到]」链接上，外层 span 文本相同但点击无效。
+ // 文字经常在外层容器上，真正的点击或提交在里面的控件上。
  if (!el.matches('a,button,input,[role="button"]') && !el.getAttribute('onclick')) {
-   const child = el.querySelector('a,button,input,[role="button"],[onclick]');
-   if (child && visible(child)) el = child;
+   const child = Array.from(el.querySelectorAll('a,button,input,[onclick]')).find(visible);
+   if (child) el = child;
  }
  if (el.href && !el.href.startsWith('javascript:') && new URL(el.href, location.href).origin !== location.origin) throw new Error('cross-origin link refused');
  const form = el.form || el.closest('form');
@@ -169,10 +169,17 @@ class PTCDPSigner:
                 return found
         content = self._navigate(page, base, path)
         page.wait(_milliseconds(rule, "preflight_wait", 1000))
-        content = self._settle(page, base, min(45, float(rule.get("cloudflare_wait") or 10)))
+        # 规则里的 cloudflare_wait 只在页面真的出现挑战时使用，避免 404 空页空等。
+        challenge_wait = min(45, float(rule.get("cloudflare_wait") or 0))
+        content = self._settle(page, base, challenge_wait if challenge_pending(content) else 1)
         found = classify(content, rule)
         if found.status in {"success", "already"} or login_page(content) or challenge_pending(content):
             return found
+        has_entry = bool(find_signin_form(content, str(page.evaluate("location.href")), str(rule.get("submit_text") or "")) or discover_signin_target(content, str(page.evaluate("location.href"))))
+        if not has_entry:
+            if authenticated(content):
+                return SignResult("failed", "已登录，但当前页面没有签到入口", missing_path=True)
+            return SignResult("failed", "签到页面不存在或没有签到入口", missing_path=True)
         # An entry link is navigation, not the final submission. Follow it in
         # this same page only when there is no actual sign-in form yet.
         if not find_signin_form(content, str(page.evaluate("location.href")), str(rule.get("submit_text") or "")):
@@ -213,7 +220,7 @@ class PTCDPSigner:
         if mode == "altcha":
             self._click(page, base, str(rule.get("altcha_checkbox_selector") or "altcha-widget input[type='checkbox']"))
             token_selector = str(rule.get("altcha_payload_selector") or "input[name='altchaPayload']")
-        elif method in {"auto", "turnstile_auto", "turnstile_click"} or page.evaluate("!!document.querySelector('.cf-turnstile,iframe[src*=\"challenges.cloudflare.com\"],input[name=\"cf-turnstile-response\"],textarea[name=\"cf-turnstile-response\"]')"):
+        elif page.evaluate("!!document.querySelector('.cf-turnstile,iframe[src*=\"challenges.cloudflare.com\"],input[name=\"cf-turnstile-response\"],textarea[name=\"cf-turnstile-response\"],altcha-widget')"):
             token_selector = str(rule.get("token_selector") or business.TURNSTILE_TOKEN_SELECTOR)
         if token_selector:
             deadline = time.monotonic() + _milliseconds(rule, "auto_wait", 20000)
@@ -223,6 +230,9 @@ class PTCDPSigner:
                 if found.status in {"success", "already"}:
                     return found
                 if self._token_ready(page, token_selector):
+                    break
+                # 规则写了等人机验证，但页面上没有验证码，也没有可点的签到控件：这是入口失效，不是验证没做完。
+                if not page.evaluate("!!document.querySelector('.cf-turnstile,iframe[src*=\"challenges.cloudflare.com\"],input[name=\"cf-turnstile-response\"],textarea[name=\"cf-turnstile-response\"],altcha-widget')"):
                     break
                 if time.monotonic() >= deadline:
                     return SignResult("failed", "人机验证码尚未自然完成，未提交；请在远端浏览器完成验证")
@@ -270,10 +280,11 @@ class PTCDPSigner:
             if found.status in {"success", "already"}:
                 return found
         if not submitted and method not in {"none", "skip"}:
-            # 如果站点配置了消失关键字（如每日签到入口在签过后消失），且当前已处于登录态，判定为今日已签
             absent = rule.get("absent_keywords") or []
             if absent and authenticated(content) and not any(str(w) in content for w in absent):
                 return SignResult("already", "今日已签到（签到入口已关闭）")
+            if authenticated(content) and not find_signin_form(content, str(page.evaluate("location.href")), str(rule.get("submit_text") or "")) and not discover_signin_target(content, str(page.evaluate("location.href"))):
+                return SignResult("failed", "已登录，但当前页面没有签到入口", missing_path=True)
             return SignResult("failed", "未找到可提交的签到按钮；" + found.message)
         return found
 
